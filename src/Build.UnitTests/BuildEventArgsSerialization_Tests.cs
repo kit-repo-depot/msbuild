@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Microsoft.Build.BackEnd;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Framework.Profiler;
 using Microsoft.Build.Logging;
@@ -70,19 +71,24 @@ namespace Microsoft.Build.UnitTests
                 toolsVersion: "Current");
             args.BuildEventContext = new BuildEventContext(1, 2, 3, 4, 5, 6);
 
-            Roundtrip(args,
+            Roundtrip<ProjectStartedEventArgs>(args,
                 e => ToString(e.BuildEventContext),
                 e => ToString(e.GlobalProperties),
-                e => ToString(e.Items.OfType<DictionaryEntry>().ToDictionary(d => d.Key.ToString(), d => ((ITaskItem)d.Value).ItemSpec)),
+                e => GetItemsString(e.Items),
                 e => e.Message,
                 e => ToString(e.ParentProjectBuildEventContext),
                 e => e.ProjectFile,
                 e => e.ProjectId.ToString(),
-                e => ToString(e.Properties.OfType<DictionaryEntry>().ToDictionary(d => d.Key.ToString(), d => d.Value.ToString())),
+                e => ToString(e.Properties.OfType<DictionaryEntry>().ToDictionary((Func<DictionaryEntry, string>)(d => d.Key.ToString()), (Func<DictionaryEntry, string>)(d => d.Value.ToString()))),
                 e => e.TargetNames,
                 e => e.ThreadId.ToString(),
                 e => e.Timestamp.ToString(),
                 e => e.ToolsVersion);
+        }
+
+        private string GetItemsString(IEnumerable items)
+        {
+            return ToString(items.OfType<DictionaryEntry>().ToDictionary(d => d.Key.ToString(), d => ((ITaskItem)d.Value).ItemSpec));
         }
 
         [Fact]
@@ -307,6 +313,17 @@ namespace Microsoft.Build.UnitTests
                 e => e.Message,
                 e => e.ProjectFile,
                 e => e.Subcategory);
+        }
+
+        [Fact]
+        public void RoundtripTaskParameterEventArgs()
+        {
+            var args = new TaskParameterEventArgs(TaskParameterMessageKind.TaskOutput, "ItemName", null, true, DateTime.MinValue, ItemGroupLoggingHelper.GetTaskParameterText);
+
+            Roundtrip(args,
+                e => e.Kind.ToString(),
+                e => e.ItemName,
+                e => GetItemsString(e.Items));
         }
 
         [Fact]

@@ -44,6 +44,7 @@ namespace Microsoft.Build.UnitTests.BackEnd
             TaskStartedEventArgs taskStarted = new TaskStartedEventArgs("message", "help", "projectFile", "taskFile", "taskName");
             TaskFinishedEventArgs taskFinished = new TaskFinishedEventArgs("message", "help", "projectFile", "taskFile", "taskName", true);
             TaskCommandLineEventArgs commandLine = new TaskCommandLineEventArgs("commandLine", "taskName", MessageImportance.Low);
+            TaskParameterEventArgs taskParameter = CreateTaskParameter();
             BuildWarningEventArgs warning = new BuildWarningEventArgs("SubCategoryForSchemaValidationErrors", "MSB4000", "file", 1, 2, 3, 4, "message", "help", "sender");
             BuildErrorEventArgs error = new BuildErrorEventArgs("SubCategoryForSchemaValidationErrors", "MSB4000", "file", 1, 2, 3, 4, "message", "help", "sender");
             TargetStartedEventArgs targetStarted = new TargetStartedEventArgs("message", "help", "targetName", "ProjectFile", "targetFile");
@@ -58,6 +59,7 @@ namespace Microsoft.Build.UnitTests.BackEnd
             VerifyLoggingPacket(taskStarted, LoggingEventType.TaskStartedEvent);
             VerifyLoggingPacket(taskFinished, LoggingEventType.TaskFinishedEvent);
             VerifyLoggingPacket(commandLine, LoggingEventType.TaskCommandLineEvent);
+            VerifyLoggingPacket(taskParameter, LoggingEventType.TaskParameterEvent);
             VerifyLoggingPacket(warning, LoggingEventType.BuildWarningEvent);
             VerifyLoggingPacket(error, LoggingEventType.BuildErrorEvent);
             VerifyLoggingPacket(targetStarted, LoggingEventType.TargetStartedEvent);
@@ -65,6 +67,11 @@ namespace Microsoft.Build.UnitTests.BackEnd
             VerifyLoggingPacket(projectStarted, LoggingEventType.ProjectStartedEvent);
             VerifyLoggingPacket(projectFinished, LoggingEventType.ProjectFinishedEvent);
             VerifyLoggingPacket(externalStartedEvent, LoggingEventType.CustomEvent);
+        }
+
+        private static TaskParameterEventArgs CreateTaskParameter()
+        {
+            return new TaskParameterEventArgs(TaskParameterMessageKind.TaskInput, "ItemName", null, true, DateTime.MinValue, s => "");
         }
 
         /// <summary>
@@ -88,6 +95,7 @@ namespace Microsoft.Build.UnitTests.BackEnd
                     new TaskStartedEventArgs("message", "help", "projectFile", "taskFile", "taskName"),
                     new TaskFinishedEventArgs("message", "help", "projectFile", "taskFile", "taskName", true),
                     new TaskCommandLineEventArgs("commandLine", "taskName", MessageImportance.Low),
+                    CreateTaskParameter(),
                     new BuildWarningEventArgs("SubCategoryForSchemaValidationErrors", "MSB4000", "file", 1, 2, 3, 4, "message", "help", "sender"),
                     new BuildErrorEventArgs("SubCategoryForSchemaValidationErrors", "MSB4000", "file", 1, 2, 3, 4, "message", "help", "sender"),
                     new TargetStartedEventArgs("message", "help", "targetName", "ProjectFile", "targetFile"),
@@ -279,6 +287,16 @@ namespace Microsoft.Build.UnitTests.BackEnd
                     Assert.Equal(leftCommand.CommandLine, rightCommand.CommandLine);
                     Assert.Equal(leftCommand.Importance, rightCommand.Importance);
                     Assert.Equal(leftCommand.TaskName, rightCommand.TaskName);
+                    break;
+
+                case LoggingEventType.TaskParameterEvent:
+                    var leftTaskParameter = left.NodeBuildEvent.Value.Value as TaskParameterEventArgs;
+                    var rightTaskParameter = right.NodeBuildEvent.Value.Value as TaskParameterEventArgs;
+                    Assert.NotNull(leftTaskParameter);
+                    Assert.NotNull(rightTaskParameter);
+                    Assert.Equal(leftTaskParameter.Kind, rightTaskParameter.Kind);
+                    Assert.Equal(leftTaskParameter.ItemName, rightTaskParameter.ItemName);
+                    Assert.Equal(leftTaskParameter.Items.Count, rightTaskParameter.Items.Count);
                     break;
 
                 case LoggingEventType.TaskFinishedEvent:

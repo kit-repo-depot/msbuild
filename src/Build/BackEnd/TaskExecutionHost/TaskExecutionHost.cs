@@ -1332,12 +1332,12 @@ namespace Microsoft.Build.BackEnd
                 parameterValue.Count > 0 &&
                 parameter.Log)
             {
-                string parameterText = ItemGroupLoggingHelper.GetParameterText(
-                    ItemGroupLoggingHelper.TaskParameterPrefix,
+                ItemGroupLoggingHelper.LogTaskParameter(
+                    _taskLoggingContext,
+                    TaskParameterMessageKind.TaskInput,
                     parameter.Name,
                     parameterValue,
                     parameter.LogItemMetadata);
-                _taskLoggingContext.LogCommentFromText(MessageImportance.Low, parameterText);
             }
 
             return InternalSetTaskParameter(parameter, (object)parameterValue);
@@ -1475,13 +1475,12 @@ namespace Microsoft.Build.BackEnd
 
                     if (LogTaskInputs && !_taskLoggingContext.LoggingService.OnlyLogCriticalEvents && outputs.Length > 0 && parameter.Log)
                     {
-                        string parameterText = ItemGroupLoggingHelper.GetParameterText(
-                            ItemGroupLoggingHelper.OutputItemParameterMessagePrefix,
+                        ItemGroupLoggingHelper.LogTaskParameter(
+                            _taskLoggingContext,
+                            TaskParameterMessageKind.TaskOutput,
                             outputTargetName,
                             outputs,
                             parameter.LogItemMetadata);
-
-                        _taskLoggingContext.LogCommentFromText(MessageImportance.Low, parameterText);
                     }
                 }
                 else
@@ -1552,12 +1551,12 @@ namespace Microsoft.Build.BackEnd
 
                     if (LogTaskInputs && !_taskLoggingContext.LoggingService.OnlyLogCriticalEvents && outputs.Length > 0 && parameter.Log)
                     {
-                        string parameterText = ItemGroupLoggingHelper.GetParameterText(
-                            ItemGroupLoggingHelper.OutputItemParameterMessagePrefix,
+                        ItemGroupLoggingHelper.LogTaskParameter(
+                            _taskLoggingContext,
+                            TaskParameterMessageKind.TaskOutput,
                             outputTargetName,
                             outputs,
                             parameter.LogItemMetadata);
-                        _taskLoggingContext.LogCommentFromText(MessageImportance.Low, parameterText);
                     }
                 }
                 else

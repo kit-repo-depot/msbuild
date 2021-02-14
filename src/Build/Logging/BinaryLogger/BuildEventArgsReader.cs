@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using Microsoft.Build.BackEnd;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Framework.Profiler;
 
@@ -145,6 +146,9 @@ namespace Microsoft.Build.Logging
                     break;
                 case BinaryLogRecordKind.TaskCommandLine:
                     result = ReadTaskCommandLineEventArgs();
+                    break;
+                case BinaryLogRecordKind.TaskParameter:
+                    result = ReadTaskParameterEventArgs();
                     break;
                 case BinaryLogRecordKind.ProjectEvaluationStarted:
                     result = ReadProjectEvaluationStartedEventArgs();
@@ -596,6 +600,27 @@ namespace Microsoft.Build.Logging
             return e;
         }
 
+        private BuildEventArgs ReadTaskParameterEventArgs()
+        {
+            var fields = ReadBuildEventArgsFields();
+            // Read unused Importance, it defaults to Low
+            ReadInt32();
+
+            var kind = (TaskParameterMessageKind)ReadInt32();
+            var itemName = ReadDeduplicatedString();
+            var items = ReadTaskItemList() as IList;
+
+            var e = ItemGroupLoggingHelper.CreateTaskParameterEventArgs(
+                fields.BuildEventContext,
+                kind,
+                itemName,
+                items,
+                true,
+                fields.Timestamp);
+            e.ProjectFile = fields.ProjectFile;
+            return e;
+        }
+
         private BuildEventArgs ReadCriticalBuildMessageEventArgs()
         {
             var fields = ReadBuildEventArgsFields();
@@ -896,65 +921,12 @@ namespace Microsoft.Build.Logging
             return result;
         }
 
-        private class TaskItem : ITaskItem
-        {
-            private static readonly Dictionary<string, string> emptyMetadata = new Dictionary<string, string>();
-
-            public string ItemSpec { get; set; }
-            public IDictionary<string, string> Metadata { get; }
-
-            public TaskItem()
-            {
-                Metadata = new Dictionary<string, string>();
-            }
-
-            public TaskItem(string itemSpec, IDictionary<string, string> metadata)
-            {
-                ItemSpec = itemSpec;
-                Metadata = metadata ?? emptyMetadata;
-            }
-
-            public int MetadataCount => Metadata.Count;
-
-            public ICollection MetadataNames => (ICollection)Metadata.Keys;
-
-            public IDictionary CloneCustomMetadata()
-            {
-                return (IDictionary)Metadata;
-            }
-
-            public void CopyMetadataTo(ITaskItem destinationItem)
-            {
-                throw new NotImplementedException();
-            }
-
-            public string GetMetadata(string metadataName)
-            {
-                return Metadata[metadataName];
-            }
-
-            public void RemoveMetadata(string metadataName)
-            {
-                throw new NotImplementedException();
-            }
-
-            public void SetMetadata(string metadataName, string metadataValue)
-            {
-                throw new NotImplementedException();
-            }
-
-            public override string ToString()
-            {
-                return $"{ItemSpec} Metadata: {MetadataCount}";
-            }
-        }
-
         private ITaskItem ReadTaskItem()
         {
             string itemSpec = ReadDeduplicatedString();
             var metadata = ReadStringDictionary();
 
-            var taskItem = new TaskItem(itemSpec, metadata);
+            var taskItem = new TaskItemData(itemSpec, metadata);
             return taskItem;
         }
 
@@ -1079,7 +1051,7 @@ namespace Microsoft.Build.Logging
 
         private int ReadInt32()
         {
-            return Read7BitEncodedInt(binaryReader);
+            return binaryReader.Read7BitEncodedInt();
         }
 
         private long ReadInt64()
@@ -1100,30 +1072,6 @@ namespace Microsoft.Build.Logging
         private TimeSpan ReadTimeSpan()
         {
             return new TimeSpan(binaryReader.ReadInt64());
-        }
-
-        private int Read7BitEncodedInt(BinaryReader reader)
-        {
-            // Read out an Int32 7 bits at a time.  The high bit
-            // of the byte when on means to continue reading more bytes.
-            int count = 0;
-            int shift = 0;
-            byte b;
-            do
-            {
-                // Check for a corrupted stream.  Read a max of 5 bytes.
-                // In a future version, add a DataFormatException.
-                if (shift == 5 * 7)  // 5 bytes max per Int32, shift += 7
-                {
-                    throw new FormatException();
-                }
-
-                // ReadByte handles end of stream cases for us.
-                b = reader.ReadByte();
-                count |= (b & 0x7F) << shift;
-                shift += 7;
-            } while ((b & 0x80) != 0);
-            return count;
         }
 
         private ProfiledLocation ReadProfiledLocation()

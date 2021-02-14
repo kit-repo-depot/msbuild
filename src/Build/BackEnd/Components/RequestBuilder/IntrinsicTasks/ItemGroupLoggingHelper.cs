@@ -5,6 +5,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using Microsoft.Build.BackEnd.Logging;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Utilities;
@@ -202,6 +203,58 @@ namespace Microsoft.Build.BackEnd
             {
                 ErrorUtilities.ThrowInternalErrorUnreachable();
             }
+        }
+
+        internal static void LogTaskParameter(
+            LoggingContext loggingContext,
+            TaskParameterMessageKind messageKind,
+            string itemType,
+            IList items,
+            bool logItemMetadata)
+        {
+            var args = CreateTaskParameterEventArgs(loggingContext.BuildEventContext, messageKind, itemType, items, logItemMetadata, DateTime.UtcNow);
+            loggingContext.LogBuildEvent(args);
+        }
+
+        internal static TaskParameterEventArgs CreateTaskParameterEventArgs(
+            BuildEventContext buildEventContext,
+            TaskParameterMessageKind messageKind,
+            string itemName,
+            IList items,
+            bool logItemMetadata,
+            DateTime timestamp)
+        {
+            var args = new TaskParameterEventArgs(
+                messageKind,
+                itemName,
+                items,
+                logItemMetadata,
+                timestamp,
+                a => GetTaskParameterText(a.Kind, a.ItemName, a.Items, logItemMetadata));
+            args.BuildEventContext = buildEventContext;
+            return args;
+        }
+
+        internal static string GetTaskParameterText(TaskParameterEventArgs args)
+            => GetTaskParameterText(args.Kind, args.ItemName, args.Items, args.LogItemMetadata);
+
+        internal static string GetTaskParameterText(TaskParameterMessageKind messageKind, string itemName, IList items, bool logItemMetadata)
+        {
+            var resourceText = messageKind switch
+            {
+                TaskParameterMessageKind.AddItem => ItemGroupIncludeLogMessagePrefix,
+                TaskParameterMessageKind.RemoveItem => ItemGroupRemoveLogMessage,
+                TaskParameterMessageKind.TaskInput => TaskParameterPrefix,
+                TaskParameterMessageKind.TaskOutput => OutputItemParameterMessagePrefix,
+                _ => throw new NotImplementedException($"Unsupported {nameof(TaskParameterMessageKind)} value: {messageKind}")
+            };
+
+            var itemGroupText = GetParameterText(
+                resourceText,
+                itemName,
+                items,
+                logItemMetadata);
+            return itemGroupText;
         }
     }
 }
